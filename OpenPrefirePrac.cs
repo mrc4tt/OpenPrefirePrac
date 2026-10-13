@@ -39,8 +39,6 @@ public class OpenPrefirePrac : BasePlugin
 
     private readonly ServerStatus _serverStatus = new();
 
-    private CCSGameRules ?_serverGameRules;
-    
     private Translator ?_translator;
 
     private readonly Dictionary<int, int> _botRequests = new();         // make this thread-safe if necessary. Map: Slot of player -> number of bots needed
@@ -50,7 +48,15 @@ public class OpenPrefirePrac : BasePlugin
     private CommandDefinition ?_command;
 
     private CounterStrikeSharp.API.Modules.Timers.Timer ?_timerBroadcastProgress;
-    
+
+    // Scratch state for the aim-lock tick loop, reused across ticks so the hot path allocates
+    // nothing. QAngle exposes X/Y/Z as `ref float` into its own native buffer, so mutating one
+    // instance in place is equivalent to handing Teleport a fresh one, minus the per-bot
+    // AllocHGlobal every tick.
+    private readonly QAngle _aimLockAngle = new(0, 0, 0);
+
+    private readonly List<int> _aimLockSlots = new();
+
     public override void Load(bool hotReload)
     {
         _playerCount = 0;
@@ -58,6 +64,7 @@ public class OpenPrefirePrac : BasePlugin
         _translator = new Translator(Localizer, ModuleDirectory, CultureInfo.CurrentCulture.Name);
         
         RegisterListener<Listeners.OnClientPutInServer>(OnClientPutInServerHandler);
+        RegisterListener<Listeners.OnClientDisconnect>(OnClientDisconnectHandler);
         RegisterListener<Listeners.OnMapStart>(OnMapStartHandler);
         RegisterListener<Listeners.OnTick>(OnTickHandler);
 
@@ -78,7 +85,6 @@ public class OpenPrefirePrac : BasePlugin
             _botRequests.Clear();
             
             // Clear saved convars
-            _serverStatus.WarmupStatus = false;
             _serverStatus.BoolConvars.Clear();
             _serverStatus.IntConvars.Clear();
             _serverStatus.FloatConvars.Clear();
@@ -86,18 +92,19 @@ public class OpenPrefirePrac : BasePlugin
 
             // // Setup map (20250109: Moved outside of the hotReload block)
             // OnMapStartHandler(Server.MapName);
-            
-            // Setup players
-            var players = Utilities.GetPlayers();
-            foreach (var tempPlayer in players)
-            {
-                if (tempPlayer == null || tempPlayer.IsBot || tempPlayer.IsHLTV)
-                {
-                    continue;
-                }
+        }
 
-                OnClientPutInServerHandler(tempPlayer.Slot);    
+        // Setup players already on the server. Runs regardless of hotReload so a
+        // cold mid-map load (css_plugins load) registers present players too,
+        // instead of needing a manual reload. Handler is idempotent.
+        foreach (var tempPlayer in Utilities.GetPlayers())
+        {
+            if (tempPlayer == null || tempPlayer.IsBot || tempPlayer.IsHLTV)
+            {
+                continue;
             }
+
+            OnClientPutInServerHandler(tempPlayer.Slot);
         }
 
         // Setup map and practice routes
@@ -118,7 +125,7 @@ public class OpenPrefirePrac : BasePlugin
             _timerBroadcastProgress = AddTimer(3f, () => PrintProgress(), TimerFlags.REPEAT);
         }
 
-        Console.WriteLine("[OpenPrefirePrac] Plugin has been loaded. If the plugin is neither loaded along with server startup, nor reloaded on the fly, please reload it once to make it fully functional.");
+        Console.WriteLine("[OpenPrefirePrac] Plugin has been loaded.");
     }
 
     public override void Unload(bool hotReload)
@@ -126,11 +133,23 @@ public class OpenPrefirePrac : BasePlugin
         UnregisterCommand();
 
         RemoveListener<Listeners.OnClientPutInServer>(OnClientPutInServerHandler);
+        RemoveListener<Listeners.OnClientDisconnect>(OnClientDisconnectHandler);
         RemoveListener<Listeners.OnMapStart>(OnMapStartHandler);
         RemoveListener<Listeners.OnTick>(OnTickHandler);
 
         if (hotReload)
         {
+            // Kick bots spawned for any in-progress practice before the old
+            // assembly goes away. Done here (not in Load) because this instance
+            // still has the owner bookkeeping KickBot needs to clean up.
+            foreach (var tempBot in Utilities.GetPlayers())
+            {
+                if (tempBot != null && tempBot.IsValid && tempBot.IsBot && !tempBot.IsHLTV)
+                {
+                    KickBot(tempBot.Slot);
+                }
+            }
+
             // Clear status registers
             _ownerOfBots.Clear();
             _practiceNameToId.Clear();
@@ -143,7 +162,6 @@ public class OpenPrefirePrac : BasePlugin
             _botRequests.Clear();
             
             // Clear saved convars
-            _serverStatus.WarmupStatus = false;
             _serverStatus.BoolConvars.Clear();
             _serverStatus.IntConvars.Clear();
             _serverStatus.FloatConvars.Clear();
@@ -204,7 +222,12 @@ public class OpenPrefirePrac : BasePlugin
         else
         {
             // For players:
-            _playerStatuses.Add(slot, new PlayerStatus(_defaultPlayerSettings!));
+            // Guard against double-registration (e.g. the Load() setup loop
+            // running for a player who is then re-announced by the engine).
+            if (!_playerStatuses.ContainsKey(slot))
+            {
+                _playerStatuses.Add(slot, new PlayerStatus(_defaultPlayerSettings!));
+            }
 
             // Record player language
             _translator!.RecordPlayerCulture(player);
@@ -238,6 +261,23 @@ public class OpenPrefirePrac : BasePlugin
         }
 
         return HookResult.Continue;
+    }
+
+    // Engine-level disconnect. Fires reliably (incl. timeout/crash/kick where the
+    // EventPlayerDisconnect game event has a null Userid). Idempotent with
+    // OnPlayerDisconnect via the ContainsKey guard.
+    private void OnClientDisconnectHandler(int slot)
+    {
+        if (!_playerStatuses.ContainsKey(slot))
+            return;
+
+        if (_playerStatuses[slot].PracticeIndex != -1)
+        {
+            ExitPrefireMode(slot);
+        }
+
+        _playerStatuses.Remove(slot);
+        _botRequests.Remove(slot);   // Remove() on absent key is a safe no-op
     }
 
     public void OnMapStartHandler(string map)
@@ -299,39 +339,45 @@ public class OpenPrefirePrac : BasePlugin
                     _playerStatuses[ownerSlot].Progress++;
                     // Console.WriteLine($"[OpenPrefirePrac] DEBUG: Update progress to {_playerStatuses[owner].Progress}.");
 
+                    // Resolve target now; dictionaries may be gone by the time the timers fire
+                    // (owner can exit practice in the 0.55s gap -> KeyNotFoundException).
+                    var target = _practices[practiceIndex].Targets[_playerStatuses[ownerSlot].EnabledTargets[targetNo]];
+                    var botSlot = playerOrBot.Slot;
+
                     AddTimer(0.5f, () => FreezeBot(playerOrBot));
 
-                    AddTimer(0.55f, () => MovePlayer(playerOrBot,
-                        _practices[practiceIndex].Targets[_playerStatuses[ownerSlot].EnabledTargets[targetNo]]
-                            .IsCrouching,
-                        _practices[practiceIndex].Targets[_playerStatuses[ownerSlot].EnabledTargets[targetNo]].Position,
-                        _practices[practiceIndex].Targets[_playerStatuses[ownerSlot].EnabledTargets[targetNo]]
-                            .Rotation));
+                    AddTimer(0.55f, () =>
+                    {
+                        // Bail if owner stopped practicing or bot got kicked meanwhile.
+                        if (!_ownerOfBots.ContainsKey(botSlot) || !_playerStatuses.ContainsKey(ownerSlot))
+                            return;
+
+                        MovePlayer(playerOrBot, target.IsCrouching, target.Position, target.Rotation);
+                    });
                     
 
                     // Give bot weapons
-                    if (_playerStatuses[ownerSlot].BotWeapon > 0)
+                    SetMoney(playerOrBot, 0);
+                    playerOrBot.RemoveWeapons();
+                    switch (_playerStatuses[ownerSlot].BotWeapon)
                     {
-                        SetMoney(playerOrBot, 0);
-                        playerOrBot.RemoveWeapons();
-                        switch (_playerStatuses[ownerSlot].BotWeapon)
-                        {
-                            case 1:
-                                playerOrBot.GiveNamedItem("weapon_ump45");
-                                break;
-                            case 2:
-                                playerOrBot.GiveNamedItem("weapon_ak47");
-                                break;
-                            case 3:
-                                playerOrBot.GiveNamedItem("weapon_ssg08");
-                                break;
-                            case 4:
-                                playerOrBot.GiveNamedItem("weapon_awp");
-                                break;
-                            default:
-                                playerOrBot.GiveNamedItem("weapon_ak47");
-                                break;
-                        }
+                        case 1:
+                            playerOrBot.GiveNamedItem("weapon_ump45");
+                            break;
+                        case 2:
+                            playerOrBot.GiveNamedItem("weapon_ak47");
+                            break;
+                        case 3:
+                            playerOrBot.GiveNamedItem("weapon_ssg08");
+                            break;
+                        case 4:
+                            playerOrBot.GiveNamedItem("weapon_awp");
+                            break;
+                        default:
+                            // 0: random primary, picked in-code (native bot buy unreliable)
+                            string[] randomWeapons = { "weapon_ump45", "weapon_ak47", "weapon_ssg08", "weapon_awp" };
+                            playerOrBot.GiveNamedItem(randomWeapons[Random.Shared.Next(randomWeapons.Length)]);
+                            break;
                     }
 
                     // Try to increase bot difficulty
@@ -445,10 +491,13 @@ public class OpenPrefirePrac : BasePlugin
                         }
                     }
 
-                    // Print progress
+                    // Per-target hit feedback (sound cue to the practicing player)
+                    PlayHitFeedback(owner);
+
+                    // Print progress (with a hitmarker to confirm the kill)
                     string tmpPractice = _translator!.Translate(owner, "map." + _mapName + "." + _practices[_playerStatuses[ownerSlot].PracticeIndex].PracticeName);
                     string tmpProgress = _translator!.Translate(owner, "practice.progress", _playerStatuses[ownerSlot].EnabledTargets.Count, _playerStatuses[ownerSlot].EnabledTargets.Count - targetNo + _playerStatuses[ownerSlot].Bots.Count - 1);
-                    string content = $"{tmpPractice}\u2029{tmpProgress}";
+                    string content = $"\u2714\u2029{tmpPractice}\u2029{tmpProgress}";
                     owner.PrintToCenter(content);
                 }
 
@@ -743,11 +792,23 @@ public class OpenPrefirePrac : BasePlugin
 
     private void SetupPrefireMode(CCSPlayerController player)
     {
+        if (player == null || !player.IsValid || !_playerStatuses.ContainsKey(player.Slot))
+            return;
+
         var practiceNo = _playerStatuses[player.Slot].PracticeIndex;
-        
-        GenerateRandomPractice(player.Slot);
+
+        // Practice may have been torn down (e.g. round reset) before this
+        // delayed setup fired. Bail out instead of indexing _practices[-1].
+        if (practiceNo < 0 || practiceNo >= _practices.Count)
+        {
+            Console.WriteLine($"[OpenPrefirePrac] Skipping setup: practice index invalid ({practiceNo}).");
+            return;
+        }
+
+        // Targets are generated in StartPractice (before bots spawn). Don't
+        // regenerate here, or we'd re-randomize against already-placed bots.
         ResetBots(player.Slot);
-        
+
         AddTimer(0.2f, () => MovePlayer(player, false, _practices[practiceNo].Player.Position, _practices[practiceNo].Player.Rotation));
         AddTimer(0.3f, () => EquipPlayer(player));
         AddTimer(0.35f, () => SetMoney(player, 60000));
@@ -916,11 +977,10 @@ public class OpenPrefirePrac : BasePlugin
         {
             // 0: Use part of the targets.
             var numTargets = (int)(_practices[practiceNo].SpawnRatio * _practices[practiceNo].Targets.Count);
-            var rnd = new Random(DateTime.Now.Millisecond);
 
             var numToRemove = _practices[practiceNo].Targets.Count - numTargets;
             for (var i = 0; i < numToRemove; i++)
-                _playerStatuses[playerSlot].EnabledTargets.RemoveAt(rnd.Next(_playerStatuses[playerSlot].EnabledTargets.Count));
+                _playerStatuses[playerSlot].EnabledTargets.RemoveAt(Random.Shared.Next(_playerStatuses[playerSlot].EnabledTargets.Count));
         }
         // 1: Use all of the targets.
     }
@@ -941,58 +1001,63 @@ public class OpenPrefirePrac : BasePlugin
         // Draw beams
         for (int i = 0; i < _practices[practiceNo].GuidingLine.Count - 1; i++)
         {
-            int beamIndex = DrawBeam(_practices[practiceNo].GuidingLine[i], _practices[practiceNo].GuidingLine[i + 1]);
-            
-            if (beamIndex == -1)
+            var beam = DrawBeam(_practices[practiceNo].GuidingLine[i], _practices[practiceNo].GuidingLine[i + 1]);
+
+            if (beam == null)
                 return;
 
-            _playerStatuses[playerSlot].Beams.Add(beamIndex);
+            _playerStatuses[playerSlot].Beams.Add(beam);
         }
     }
 
     private void DeleteGuidingLine(int playerSlot)
     {
-        for (var i = 0; i < _playerStatuses[playerSlot].Beams.Count; i++)
+        foreach (var beam in _playerStatuses[playerSlot].Beams)
         {
-            var beam = Utilities.GetEntityFromIndex<CBeam>(_playerStatuses[playerSlot].Beams[i]);
-
             if (beam == null || !beam.IsValid)
-            {
-                Console.WriteLine($"[OpenPrefirePrac] Error when deleting guiding line. Failed to get beam entity(index = {_playerStatuses[playerSlot].Beams[i]})");
                 continue;
-            }
 
-            beam.Remove();
+            try
+            {
+                beam.Remove();
+            }
+            catch (Exception e)
+            {
+                // Entity may already be freed by the engine (e.g. round restart).
+                Console.WriteLine($"[OpenPrefirePrac] Error when deleting guiding line. {e.Message}");
+            }
         }
 
         _playerStatuses[playerSlot].Beams.Clear();
     }
 
-    private static int DrawBeam(Vector startPos, Vector endPos)
+    private static CBeam? DrawBeam(Vector startPos, Vector endPos)
     {
         var beam = Utilities.CreateEntityByName<CBeam>("beam");
         if (beam == null)
         {
             // Failed to create beam
             Console.WriteLine($"[OpenPrefirePrac] Failed to create beam. Start position: {startPos}, end position: {endPos}");
-            return -1;
+            return null;
         }
 
         beam.Render = System.Drawing.Color.Blue;
         beam.Width = 2.0f;
 
         beam.Teleport(startPos, QAngle.Zero, Vector.Zero);
-        beam.EndPos.Add(endPos);
+        beam.EndPos.X = endPos.X;
+        beam.EndPos.Y = endPos.Y;
+        beam.EndPos.Z = endPos.Z;
         beam.DispatchSpawn();
+        Utilities.SetStateChanged(beam, "CBeam", "m_vecEndPos");
 
         // Console.WriteLine($"[OpenPrefirePrac] Created a beam. Start position: {startPos}, end position: {endPos}, entity index: {beam.Index}");
-        return (int)beam.Index;
+        return beam;
     }
 
     private void SaveConvars()
     {
         string[] boolConvarNames = [
-            "tv_enable",
             "bot_allow_grenades",
             "bot_allow_shotguns",
             "mp_autoteambalance",
@@ -1002,11 +1067,11 @@ public class OpenPrefirePrac : BasePlugin
             "bot_allow_rifles",
             "bot_allow_snipers",
             "sv_auto_adjust_bot_difficulty",
+            "mp_ignore_round_win_conditions",
         ];
 
         string[] intConvarNames = [
             "mp_buy_anywhere",
-            "mp_warmup_pausetimer",
             "mp_free_armor",
             "mp_limitteams",
             // "sv_infinite_ammo",
@@ -1017,12 +1082,15 @@ public class OpenPrefirePrac : BasePlugin
             "mp_death_drop_gun",
             "mp_death_drop_grenade",
             "bot_quota",
+            "mp_freezetime",
         ];
 
         string[] floatConvarNames = [
             "mp_respawn_immunitytime",
             "mp_buytime",
             "bot_max_vision_distance_override",
+            "mp_roundtime",
+            "mp_roundtime_defuse",
         ];
 
         string[] stringConvarNames = [
@@ -1092,21 +1160,6 @@ public class OpenPrefirePrac : BasePlugin
             throw;
         }
 
-        // Read Warmup status
-        try
-        {
-            if (_serverGameRules == null)
-            {
-                _serverGameRules = Utilities.FindAllEntitiesByDesignerName<CCSGameRulesProxy>("cs_gamerules").First().GameRules!;
-            }
-            _serverStatus.WarmupStatus = _serverGameRules.WarmupPeriod;
-            // Console.WriteLine($"[OpenPrefirePrac] Warmup Status: {_serverGameRules.WarmupPeriod}");
-        }
-        catch (System.Exception)
-        {
-            Console.WriteLine($"[OpenPrefirePrac] Can't read server's warmup status, will use the default value {_serverStatus.WarmupStatus}.");
-        }
-
         Console.WriteLine("[OpenPrefirePrac] Values of convars saved.");
     }
 
@@ -1157,18 +1210,16 @@ public class OpenPrefirePrac : BasePlugin
         // sv_cheats!.SetValue(_serverStatus.sv_cheats);
         // Server.ExecuteCommand("sv_cheats " + _serverStatus.sv_cheats.ToString());
 
-        // Restore warmup status
-        if (!_serverStatus.WarmupStatus)
-        {
-            Server.ExecuteCommand("mp_warmup_end");
-        }
-
         Console.WriteLine("[OpenPrefirePrac] Values of convars restored.");
     }
 
     private void SetupConvars()
     {
-        Server.ExecuteCommand("tv_enable 0");
+        // NOTE: Do NOT toggle tv_enable here. Changing tv_enable at runtime makes
+        // CS2 rebuild the player/HLTV slot table ("maxplayers set to 64") and resets
+        // server state (ss_active -> ss_dead), which drops the A2S query socket and
+        // breaks external server queries (gamedig) for the whole practice session.
+        // SourceTV is left to the server's launch/cfg config.
         // Server.ExecuteCommand("sv_cheats 1");
         Server.ExecuteCommand("bot_allow_grenades 0");
         Server.ExecuteCommand("bot_allow_shotguns 0");
@@ -1181,7 +1232,6 @@ public class OpenPrefirePrac : BasePlugin
         Server.ExecuteCommand("sv_auto_adjust_bot_difficulty 0");
 
         Server.ExecuteCommand("mp_buy_anywhere 1");
-        Server.ExecuteCommand("mp_warmup_pausetimer 1");
         Server.ExecuteCommand("mp_free_armor 2");
         Server.ExecuteCommand("mp_limitteams 0");
         // Server.ExecuteCommand("sv_infinite_ammo 1");
@@ -1193,6 +1243,13 @@ public class OpenPrefirePrac : BasePlugin
         Server.ExecuteCommand("mp_death_drop_grenade 0");
         Server.ExecuteCommand("bot_quota 0");
 
+        // Keep the round alive while practicing. Previously warmup did this job;
+        // without it, wiping a team would end the round and tear down the practice.
+        Server.ExecuteCommand("mp_ignore_round_win_conditions 1");
+        Server.ExecuteCommand("mp_roundtime 60");
+        Server.ExecuteCommand("mp_roundtime_defuse 60");
+        Server.ExecuteCommand("mp_freezetime 2");
+
         Server.ExecuteCommand("mp_respawn_immunitytime -1");
         Server.ExecuteCommand("mp_buytime 9999");
         Server.ExecuteCommand("bot_max_vision_distance_override 99999");
@@ -1200,8 +1257,7 @@ public class OpenPrefirePrac : BasePlugin
         Server.ExecuteCommand("bot_quota_mode normal");
         Server.ExecuteCommand("mp_ct_default_melee \"\"");
         Server.ExecuteCommand("mp_t_default_melee \"\"");
-        
-        Server.ExecuteCommand("mp_warmup_start");
+
         // Server.ExecuteCommand("bot_kick all");
 
         // Set behavior tree for bots (many thanks to 5EPlay)
@@ -1236,17 +1292,17 @@ public class OpenPrefirePrac : BasePlugin
             botsToKick.Clear();
         });
 
-        // Server.ExecuteCommand("bot_autodifficulty_threshold_high 5");
-        // Server.ExecuteCommand("bot_autodifficulty_threshold_low 5");
-        // Server.ExecuteCommand("sv_auto_adjust_bot_difficulty 0");
-        // Server.ExecuteCommand("weapon_auto_cleanup_time 1");       
-        // Server.ExecuteCommand("mp_roundtime 60");
-        // Server.ExecuteCommand("mp_roundtime_defuse 60");
-        // Server.ExecuteCommand("mp_freezetime 0");
-        // Server.ExecuteCommand("mp_team_intro_time 0");
-        // Server.ExecuteCommand("mp_ignore_round_win_conditions 1");
-        // Server.ExecuteCommand("mp_respawn_on_death_ct 1");
-        // Server.ExecuteCommand("mp_respawn_on_death_t 1");
+        Server.ExecuteCommand("bot_autodifficulty_threshold_high 5");
+        Server.ExecuteCommand("bot_autodifficulty_threshold_low 5");
+        Server.ExecuteCommand("sv_auto_adjust_bot_difficulty 0");
+        Server.ExecuteCommand("weapon_auto_cleanup_time 1");       
+        Server.ExecuteCommand("mp_roundtime 60");
+        Server.ExecuteCommand("mp_roundtime_defuse 60");
+        Server.ExecuteCommand("mp_freezetime 0");
+        Server.ExecuteCommand("mp_team_intro_time 0");
+        Server.ExecuteCommand("mp_ignore_round_win_conditions 1");
+        Server.ExecuteCommand("mp_respawn_on_death_ct 1");
+        Server.ExecuteCommand("mp_respawn_on_death_t 1");
 
         Console.WriteLine("[OpenPrefirePrac] Values of convars set.");
     }
@@ -1339,6 +1395,13 @@ public class OpenPrefirePrac : BasePlugin
             
             _playerCount++;
             _playerStatuses[player.Slot].PracticeIndex = practiceIndex;
+
+            // Generate targets BEFORE adding bots. Bots spawn almost immediately
+            // after AddBot; if EnabledTargets is still empty when OnPlayerSpawn
+            // fires, every bot falls into the "extra bot" branch and gets kicked,
+            // tearing down the practice. (Warmup used to delay spawns past setup.)
+            GenerateRandomPractice(player.Slot);
+
             AddTimer(1f, () => CreateGuidingLine(player.Slot));
 
             // Disable incompatible practices.
@@ -1579,8 +1642,9 @@ public class OpenPrefirePrac : BasePlugin
             // 6 Language menu
             mainMenu.AddMenuOption("Language preference", OpenLanguageMenu);
 
-            // 7 (Optional) End practicing button
-            if (_playerStatuses[player.Slot].PracticeIndex > 0)
+            // 7 (Optional) End practicing button — show whenever a practice is
+            // active (index 0 is a valid route, so use > -1, not > 0).
+            if (_playerStatuses[player.Slot].PracticeIndex > -1)
             {
                 mainMenu.AddMenuOption(_translator.Translate(player, "mainmenu.exit"), OnForceExitPrefireMode);
             }
@@ -1722,6 +1786,19 @@ public class OpenPrefirePrac : BasePlugin
         }
     }
 
+    private void PlayHitFeedback(CCSPlayerController owner)
+    {
+        var sound = _defaultPlayerSettings!.HitFeedbackSound;
+
+        if (string.IsNullOrEmpty(sound) || owner.PlayerPawn.Value == null)
+        {
+            return;
+        }
+
+        // Play the cue only to the practicing player.
+        owner.PlayerPawn.Value.EmitSound(sound, new RecipientFilter(owner));
+    }
+
     private void KickBot(int botSlot)
     {
 
@@ -1828,51 +1905,77 @@ public class OpenPrefirePrac : BasePlugin
         }
     }
 
+    // Runs on the game thread once per tick. Everything in here is on the server's frame
+    // budget (15.6ms at 64 tick), so it is kept allocation-free: the old version built two
+    // Vectors, a QAngle and a Server.NextFrame closure per bot per tick, which with a handful
+    // of players practising is thousands of gen0 objects a second and the GC pauses that come
+    // with them. The work is also done inline rather than deferred to the next frame — this
+    // listener already runs inside the game frame, so the deferral bought nothing but garbage.
     private void OnTickHandler()
     {
-        if (_defaultPlayerSettings!.BotAimLock == 1)
+        if (_defaultPlayerSettings!.BotAimLock != 1)
         {
-            foreach (int playerSlot in _playerStatuses.Keys)
-            {
-                var player = Utilities.GetPlayerFromSlot(playerSlot);
+            return;
+        }
 
-                if (player == null || !player.IsValid || !player.PawnIsAlive || player.PlayerPawn.Value == null)
+        // Snapshot the slots: the teleports below can run engine code that touches
+        // _playerStatuses, which would invalidate a live enumerator.
+        _aimLockSlots.Clear();
+        foreach (var slot in _playerStatuses.Keys)
+        {
+            _aimLockSlots.Add(slot);
+        }
+
+        foreach (int playerSlot in _aimLockSlots)
+        {
+            if (!_playerStatuses.TryGetValue(playerSlot, out var status))
+            {
+                continue;
+            }
+
+            var player = Utilities.GetPlayerFromSlot(playerSlot);
+
+            if (player == null || !player.IsValid || !player.PawnIsAlive || player.PlayerPawn.Value == null)
+            {
+                continue;
+            }
+
+            // Aimlock bots
+            var ownerOrigin = player.PlayerPawn.Value.AbsOrigin!;
+            float ownerEyeX = ownerOrigin.X;
+            float ownerEyeY = ownerOrigin.Y;
+            float ownerEyeZ = ownerOrigin.Z + player.PlayerPawn.Value.ViewmodelOffsetZ;
+
+            foreach (var botSlot in status.Bots)
+            {
+                var bot = Utilities.GetPlayerFromSlot(botSlot);
+
+                if (bot == null || !bot.IsValid || !bot.PawnIsAlive || bot.PlayerPawn.Value == null)
                 {
                     continue;
                 }
 
-                // Aimlock bots
-                Vector ownerEyePos = new Vector(player.PlayerPawn.Value.AbsOrigin!.X, player.PlayerPawn.Value.AbsOrigin!.Y, player.PlayerPawn.Value.AbsOrigin!.Z + player.PlayerPawn.Value.ViewmodelOffsetZ);
+                var botPawn = bot.PlayerPawn.Value;
+                var botOrigin = botPawn.AbsOrigin!;
 
-                foreach(var botSlot in _playerStatuses[playerSlot].Bots)
+                // calculate angle
+                float deltaX = ownerEyeX - botOrigin.X;
+                float deltaY = ownerEyeY - botOrigin.Y;
+                float deltaZ = ownerEyeZ - (botOrigin.Z + botPawn.ViewmodelOffsetZ);
+                double yaw = 180 * Math.Atan2(deltaY, deltaX) / Math.PI;
+                double tmp = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
+                double pitch = 180 * Math.Atan2(-1 * deltaZ, tmp) / Math.PI;
+
+                if (pitch < 15 && pitch > -15)
                 {
-                    var bot = Utilities.GetPlayerFromSlot(botSlot);
-
-                    if (bot == null || !bot.IsValid || !bot.PawnIsAlive || bot.PlayerPawn.Value == null)
-                    {
-                        continue;
-                    }
-
-                    Vector botEyePosition = new Vector(bot.PlayerPawn.Value.AbsOrigin!.X, bot.PlayerPawn.Value.AbsOrigin!.Y, bot.PlayerPawn.Value.AbsOrigin!.Z + bot.PlayerPawn.Value.ViewmodelOffsetZ);
-
-                    // calculate angle
-                    float deltaX = ownerEyePos.X - botEyePosition.X;
-                    float deltaY = ownerEyePos.Y - botEyePosition.Y;
-                    float deltaZ = ownerEyePos.Z - botEyePosition.Z;
-                    double yaw = 180 * Math.Atan2(deltaY, deltaX) / Math.PI;
-                    double tmp = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
-                    double pitch= 180 * Math.Atan2(-1 * deltaZ, tmp) / Math.PI;
-                    QAngle angle = new QAngle((float)pitch, (float)yaw, 0);
-
-                    Server.NextFrame(() => {
-                        if (pitch < 15 && pitch > -15)
-                        {
-                            bot.PlayerPawn.Value.Teleport(null, angle, null);
-                        }
-                        bot.PlayerPawn.Value.EyeAngles.X = (float)pitch;
-                        bot.PlayerPawn.Value.EyeAngles.Y = (float)yaw;
-                    });
+                    _aimLockAngle.X = (float)pitch;
+                    _aimLockAngle.Y = (float)yaw;
+                    _aimLockAngle.Z = 0;
+                    botPawn.Teleport(null, _aimLockAngle, null);
                 }
+
+                botPawn.EyeAngles.X = (float)pitch;
+                botPawn.EyeAngles.Y = (float)yaw;
             }
         }
     }

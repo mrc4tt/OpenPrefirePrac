@@ -2,3 +2,10 @@
 /bin
 /obj
 /OpenPrefirePrac.sln.DotSettings.user
+
+# Local
+hm
+.claude/
+.css/
+dist/
+obj/

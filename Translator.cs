@@ -64,6 +64,8 @@ public class Translator
     {
         var steamId = player.SteamID;
 
+        if (!_languageManager.ContainsKey(steamId))
+            _languageManager[steamId] = _defaultCulture;
         var playerCulture = _languageManager[steamId];
 
         using (new WithTemporaryCulture(CultureInfo.GetCultureInfo(playerCulture)))
@@ -76,6 +78,8 @@ public class Translator
     {
         var steamId = player.SteamID;
 
+        if (!_languageManager.ContainsKey(steamId))
+            _languageManager[steamId] = _defaultCulture;
         var playerCulture = _languageManager[steamId];
 
         using (new WithTemporaryCulture(CultureInfo.GetCultureInfo(playerCulture)))
@@ -138,7 +142,7 @@ public class Translator
 
     public string? GetPlayerIsoCode(string ipAddress)
     {
-        var geoDbPath = Path.Combine(_pluginPath, "resources", "/GeoLite2-Country.mmdb");
+        var geoDbPath = Path.Combine(_pluginPath, "resources", "GeoLite2-Country.mmdb");
         
         // check if the database file exists
         if (!File.Exists(geoDbPath))

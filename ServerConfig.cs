@@ -19,6 +19,13 @@ public class DefaultConfig
 
     public int EquipPlayer { get; set; } = 1;
 
+    /*
+     * Soundevent played to the practicing player each time they kill a target.
+     * Empty string disables the sound (visual hitmarker still shows).
+     * Override in default_cfg.json if this soundevent isn't present on your server.
+    */
+    public string HitFeedbackSound { get; set; } = "Buttons.snd9";
+
     private string _moduleDirectory = "";
 
     public DefaultConfig()
@@ -81,7 +88,12 @@ public class DefaultConfig
                     EquipPlayer = jsonConfig.EquipPlayer;
                 }
 
-                Console.WriteLine($"[OpenPrefirePrac] Using default settings: Difficulty = {Difficulty}, TrainingMode = {TrainingMode}, BotWeapon = {BotWeapon}, BotAimLock = {BotAimLock}, EquipPlayer = {EquipPlayer}");
+                if (jsonConfig.HitFeedbackSound != null)
+                {
+                    HitFeedbackSound = jsonConfig.HitFeedbackSound;
+                }
+
+                Console.WriteLine($"[OpenPrefirePrac] Using default settings: Difficulty = {Difficulty}, TrainingMode = {TrainingMode}, BotWeapon = {BotWeapon}, BotAimLock = {BotAimLock}, EquipPlayer = {EquipPlayer}, HitFeedbackSound = {HitFeedbackSound}");
             }
             catch (System.Exception)
             {

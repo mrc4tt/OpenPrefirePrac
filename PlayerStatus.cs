@@ -34,7 +34,7 @@ public class PlayerStatus
     public readonly Dictionary<string, int> LocalizedTrainingModeNames = new();
 
     public readonly List<int> EnabledTargets = new();
-    public readonly List<int> Beams = new();
+    public readonly List<CBeam> Beams = new();
 
     /**
      * 0: Bots buy weapons randomly.
