@@ -1,4 +1,12 @@
-# OpenPrefirePrac
+# OpenPrefirePrac (fshost build)
+
+> This is fshost's maintained copy of **[lengran/OpenPrefirePrac](https://github.com/lengran/OpenPrefirePrac)**
+> by **lengran** and contributors. All credit for the plugin goes to the original authors.
+> It is distributed under the original MIT license (see [LICENSE](LICENSE)).
+>
+> Differences from upstream: built against the CounterStrikeSharp API fshost runs
+> (mrc4tt/CounterStrikeSharp), works when loaded and unloaded with `css_plugins load/unload`,
+> settings live in `configs/plugins/OpenPrefirePrac/`, and the fixes listed in [CHANGELOG.md](CHANGELOG.md).
 
 An open-source CounterStrikeSharp powered server-side practicing plugin for CS2. It provides multiple prefire practices on competitive map pool maps and support multiplayer practicing concurrently.
 
@@ -10,7 +18,7 @@ An open-source CounterStrikeSharp powered server-side practicing plugin for CS2.
 
 ### Installation
 
-Download [the latest release files](https://github.com/lengran/OpenPrefirePrac/releases) and extract all files into "**game/csgo/addons/counterstrikesharp/plugins/OpenPrefirePrac/**".
+Download **OpenPrefirePrac.zip** from [the latest release](https://github.com/mrc4tt/OpenPrefirePrac/releases/latest) and extract it into "**game/csgo/**" (it contains `addons/counterstrikesharp/plugins/OpenPrefirePrac/`).
 
 To install the latest version of CounterStrikeSharp, please refer to this [guide](https://docs.cssharp.dev/docs/guides/getting-started.html).
 
@@ -44,7 +52,7 @@ You can always use **!prefire help** to see how to use them.
 
 ### Adjust default settings
 
-Now the plugin supports loading default settings of difficulty and training mode from a json file. You can rename *default_cfg.json.example* to *default_cfg.json* and modify the value as you like.
+On first start the plugin creates "**addons/counterstrikesharp/configs/plugins/OpenPrefirePrac/default_cfg.json**" with the default settings (an existing *default_cfg.json* in the plugin folder is copied there). Modify the values as you like; the file survives plugin updates.
 
 Explanation of values:
 

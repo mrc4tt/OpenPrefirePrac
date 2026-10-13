@@ -167,6 +167,18 @@ public class OpenPrefirePrac : BasePlugin
             _serverStatus.FloatConvars.Clear();
             _serverStatus.StringConvars.Clear();
         }
+        else
+        {
+            // Plain unload (css_plugins unload, e.g. fshost's CustomCommands switching mode):
+            // remove the practice bots this plugin spawned and put back the convars it changed,
+            // so the next mode does not inherit them.
+            foreach (var botSlot in _ownerOfBots.Keys.ToList())
+            {
+                KickBot(botSlot);
+            }
+
+            RestoreConvars();
+        }
 
         if (_timerBroadcastProgress != null)
         {
