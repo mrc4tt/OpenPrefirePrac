@@ -20,6 +20,15 @@ An open-source CounterStrikeSharp powered server-side practicing plugin for CS2.
 
 Download **OpenPrefirePrac.zip** from [the latest release](https://github.com/mrc4tt/OpenPrefirePrac/releases/latest) and extract it into "**game/csgo/**" (it contains `addons/counterstrikesharp/plugins/OpenPrefirePrac/`).
 
+> **Keep `resources/bt/` at `addons/counterstrikesharp/plugins/OpenPrefirePrac/resources/bt/`.** The plugin points
+> `mp_bot_ai_bt` at that fixed path (and the `.kv3` files reference each other there), so it must stay in that
+> place even if the rest of the plugin lives elsewhere. On fshost servers the plugin itself (dll, `maps/`, `lang/`,
+> `resources/GeoLite2-Country.mmdb`) is in `plugins/disabled/OpenPrefirePrac/` and only `resources/bt/` stays in
+> `plugins/OpenPrefirePrac/`. GeoLite2 is read from the plugin's own folder, wherever that is.
+>
+> On fshost, updates never overwrite existing files in `maps/` or `lang/` (customer edits win; only new files are
+> added), and `addons/counterstrikesharp/configs/` is never touched.
+
 To install the latest version of CounterStrikeSharp, please refer to this [guide](https://docs.cssharp.dev/docs/guides/getting-started.html).
 
 ## How to use
