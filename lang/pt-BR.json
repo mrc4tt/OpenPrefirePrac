@@ -14,6 +14,7 @@
     "mapmenu.busy": "Outros jogadores estão praticando. Tente novamente mais tarde.",
     "mapmenu.not_available": "Desculpe, mas não temos nenhuma rota de prática para o mapa escolhido.",
     "practicemenu.title": "Escolha a rota de prefire",
+    "practice.nobots": "O treino de prefire precisa de bots, mas este servidor foi iniciado com -nobots. Peça ao dono do servidor para remover -nobots dos parâmetros de inicialização.",
     "practice.incompatible": "Outros estão jogando rotas incompatíveis que podem compartilhar alguns bots com a rota selecionada. Por favor, escolha outra prática.",
     "practice.choose" : "Iniciando rota de prefire ({0}).",
     "practice.begin": "Bons treinos!",

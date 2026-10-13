@@ -14,6 +14,7 @@
     "mapmenu.busy": "有玩家正在训练，请稍后再试。",
     "mapmenu.not_available": "目前还没有所选地图的预瞄路线。",
     "practicemenu.title": "请选择训练路线",
+    "practice.nobots": "预瞄练习需要机器人，但本服务器以 -nobots 启动。请联系服主从启动参数中移除 -nobots。",
     "practice.incompatible": "其他玩家（或您）正在进行与您所选训练冲突的训练，请退出当前训练再试，或等待其他玩家完成训练。",
     "practice.choose" : "正在开始训练 ({0})。",
     "practice.begin": "训练愉快！",

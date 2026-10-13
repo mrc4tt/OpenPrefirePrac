@@ -14,6 +14,7 @@
     "mapmenu.busy": "There are other players practicing. Try again later.",
     "mapmenu.not_available": "Sorry, we don't have any practice routes for the chosen map.",
     "practicemenu.title": "Choose prefire route",
+    "practice.nobots": "Prefire practice needs bots, but this server is started with -nobots. Ask the server owner to remove -nobots from the start parameters.",
     "practice.incompatible": "Others are playing incompatible routes that might share some bots with your selected route. Please choose another practice.",
     "practice.choose" : "Starting prefire route ({0}).",
     "practice.begin": "Happy training!",

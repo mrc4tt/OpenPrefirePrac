@@ -57,9 +57,28 @@ public class OpenPrefirePrac : BasePlugin
 
     private readonly List<int> _aimLockSlots = new();
 
+    // Practices are played against bots, so they cannot work on a server started with -nobots:
+    // bot_add does not give working bots there and players end up shooting at invisible targets.
+    private bool _botsDisabled;
+
     public override void Load(bool hotReload)
     {
         _playerCount = 0;
+
+        try
+        {
+            _botsDisabled = CommandLine.HasParam("-nobots");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"[OpenPrefirePrac] Could not read the server command line: {e.Message}");
+            _botsDisabled = false;
+        }
+
+        if (_botsDisabled)
+        {
+            Console.WriteLine("[OpenPrefirePrac] The server was started with -nobots. Prefire practices need bots and are disabled; remove -nobots from the start parameters to use them.");
+        }
 
         _translator = new Translator(Localizer, ModuleDirectory, CultureInfo.CurrentCulture.Name);
         
@@ -1380,6 +1399,12 @@ public class OpenPrefirePrac : BasePlugin
 
     private void StartPractice(CCSPlayerController player, int practiceIndex)
     {
+        if (_botsDisabled)
+        {
+            player.PrintToChat($" {ChatColors.Green}[OpenPrefirePrac] {ChatColors.White}{_translator!.Translate(player, "practice.nobots")}");
+            return;
+        }
+
         if (_playerCount == 0)
         {
             SaveConvars();
