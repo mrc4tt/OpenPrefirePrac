@@ -13,5 +13,11 @@
     <PackageReference Include="MaxMind.Db" Version="5.1.0" />
   </ItemGroup>
 
+  <!-- The practice profiles, translations and bot behaviour trees belong next to the dll, so a plain
+       Release build/publish is deployable too (not only the package.sh zip). -->
+  <ItemGroup>
+    <None Include="maps\**\*;lang\**\*;resources\**\*" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <Import Project="CounterStrikeSharp.targets" />
 </Project>
