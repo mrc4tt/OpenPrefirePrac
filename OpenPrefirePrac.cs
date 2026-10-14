@@ -398,14 +398,25 @@ public partial class OpenPrefirePrac : BasePlugin
                     var target = _practices[practiceIndex].Targets[_playerStatuses[ownerSlot].EnabledTargets[targetNo]];
                     var botSlot = playerOrBot.Slot;
 
-                    AddTimer(0.5f, () => FreezeBot(playerOrBot));
-
-                    AddTimer(0.55f, () =>
+                    // Move first, freeze after: the bot used to be frozen at 0.5s and moved at 0.55s, so it
+                    // was frozen mid-run (left out of spawn) and kept its running legs at the target.
+                    // Teleport it with zero velocity right after spawning, then freeze it once it stands
+                    // still, and place it once more so it is exactly on the spot.
+                    AddTimer(0.1f, () =>
                     {
                         // Bail if owner stopped practicing or bot got kicked meanwhile.
                         if (!_ownerOfBots.ContainsKey(botSlot) || !_playerStatuses.ContainsKey(ownerSlot))
                             return;
 
+                        MovePlayer(playerOrBot, target.IsCrouching, target.Position, target.Rotation);
+                    });
+
+                    AddTimer(0.4f, () =>
+                    {
+                        if (!_ownerOfBots.ContainsKey(botSlot) || !_playerStatuses.ContainsKey(ownerSlot))
+                            return;
+
+                        FreezeBot(playerOrBot);
                         MovePlayer(playerOrBot, target.IsCrouching, target.Position, target.Rotation);
                     });
                     
