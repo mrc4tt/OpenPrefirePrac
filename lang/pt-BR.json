@@ -17,6 +17,7 @@
     "practice.nobots": "O treino de prefire precisa de bots, mas este servidor foi iniciado com -nobots. Peça ao dono do servidor para remover -nobots dos parâmetros de inicialização.",
     "practice.incompatible": "Outros estão jogando rotas incompatíveis que podem compartilhar alguns bots com a rota selecionada. Por favor, escolha outra prática.",
     "practice.choose" : "Iniciando rota de prefire ({0}).",
+    "mainmenu.loaded": "O treino de prefire está ativo. Digite [GREEN]!prefire[NORMAL] para escolher uma rota.",
     "practice.begin": "Bons treinos!",
     "practice.exit": "Modo prefire encerrado.",
     "practice.finish": "Parabéns! Você terminou sua prática de prefire!",

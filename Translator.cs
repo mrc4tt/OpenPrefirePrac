@@ -70,8 +70,20 @@ public class Translator
 
         using (new WithTemporaryCulture(CultureInfo.GetCultureInfo(playerCulture)))
         {
-            return ParseMsg(_localizer[tokenToLocalize]);
+            var localized = _localizer[tokenToLocalize];
+            // A practice without a "map.<map>.<route>" line in lang/ (a newly recorded route, or a
+            // deploy without the lang folder) showed the raw key in menus and the HUD. Show the
+            // route's file name in readable form instead, e.g. "b_main" -> "B main".
+            if (localized.ResourceNotFound && tokenToLocalize.StartsWith("map.", StringComparison.Ordinal))
+                return RouteNameFromKey(tokenToLocalize);
+            return ParseMsg(localized);
         }
+    }
+
+    private static string RouteNameFromKey(string key)
+    {
+        var route = key.Substring(key.LastIndexOf('.') + 1).Replace('_', ' ').Trim();
+        return route.Length == 0 ? key : char.ToUpperInvariant(route[0]) + route.Substring(1);
     }
 
     public string Translate(CCSPlayerController player, string tokenToLocalize, params object[] arguments)

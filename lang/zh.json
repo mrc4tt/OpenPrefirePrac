@@ -17,6 +17,7 @@
     "practice.nobots": "预瞄练习需要机器人，但本服务器以 -nobots 启动。请联系服主从启动参数中移除 -nobots。",
     "practice.incompatible": "其他玩家（或您）正在进行与您所选训练冲突的训练，请退出当前训练再试，或等待其他玩家完成训练。",
     "practice.choose" : "正在开始训练 ({0})。",
+    "mainmenu.loaded": "预瞄练习已开启。输入 [GREEN]!prefire[NORMAL] 选择路线。",
     "practice.begin": "训练愉快！",
     "practice.exit": "预瞄训练模式已退出。",
     "practice.finish": "恭喜！您完成了训练！",

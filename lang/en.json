@@ -17,6 +17,7 @@
     "practice.nobots": "Prefire practice needs bots, but this server is started with -nobots. Ask the server owner to remove -nobots from the start parameters.",
     "practice.incompatible": "Others are playing incompatible routes that might share some bots with your selected route. Please choose another practice.",
     "practice.choose" : "Starting prefire route ({0}).",
+    "mainmenu.loaded": "Prefire practice is on. Type [GREEN]!prefire[NORMAL] to choose a route.",
     "practice.begin": "Happy training!",
     "practice.exit": "Prefire mode exited.",
     "practice.finish": "Congratulations! You have finished your prefire practice!",

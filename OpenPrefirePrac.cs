@@ -139,6 +139,20 @@ public partial class OpenPrefirePrac : BasePlugin
 
         RegisterCommand();
 
+        // Loaded by !prefireon (fshost CustomCommands) while players are on the server: tell them how to
+        // pick a route, since !prefireon only loads the plugin and !prefire opens its menu.
+        if (!hotReload)
+        {
+            AddTimer(3f, () =>
+            {
+                foreach (var p in Utilities.GetPlayers())
+                {
+                    if (p != null && p.IsValid && !p.IsBot && !p.IsHLTV)
+                        p.PrintToChat($" {ChatColors.Green}[OpenPrefirePrac] {ChatColors.White}{_translator!.Translate(p, "mainmenu.loaded")}");
+                }
+            });
+        }
+
         if (_timerBroadcastProgress == null)
         {
             _timerBroadcastProgress = AddTimer(3f, () => PrintProgress(), TimerFlags.REPEAT);
@@ -317,6 +331,11 @@ public partial class OpenPrefirePrac : BasePlugin
     public void OnMapStartHandler(string map)
     {
         _mapName = map;
+
+        // Prefire servers don't need a freeze time, even before a route is started. A map (re)load
+        // brings the game mode's freeze time back after !prefireon set it to 0, so clear it again
+        // once the map's own cfgs have run. Practices set their full convars when they start.
+        AddTimer(2f, () => Server.ExecuteCommand("mp_freezetime 0; mp_team_intro_time 0"), CounterStrikeSharp.API.Modules.Timers.TimerFlags.STOP_ON_MAPCHANGE);
 
         // load practices available in current map, from corresponding map directory.
         _availableMaps.Clear();
