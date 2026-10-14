@@ -14,10 +14,10 @@ using CounterStrikeSharp.API.Modules.Entities;
 
 namespace OpenPrefirePrac;
 
-public class OpenPrefirePrac : BasePlugin
+public partial class OpenPrefirePrac : BasePlugin
 {
     public override string ModuleName => "Open Prefire Prac";
-    public override string ModuleVersion => "0.1.48";
+    public override string ModuleVersion => "0.1.49";
     public override string ModuleAuthor => "Lengran";
     public override string ModuleDescription => "A plugin for practicing prefire in CS2. https://github.com/lengran/OpenPrefirePrac";
 
@@ -1680,6 +1680,9 @@ public class OpenPrefirePrac : BasePlugin
                         return;
                     case "exit":
                         ForceStopPractice(player);
+                        return;
+                    case "rec":
+                        HandleRecordCommand(player, commandInfo);
                         return;
                     case "help":
                         player.PrintToChat($" {ChatColors.Green}[OpenPrefirePrac] {ChatColors.White} {_translator!.Translate(player, "mainmenu.help", _practices.Count)}");

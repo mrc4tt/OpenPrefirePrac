@@ -133,6 +133,28 @@ Each line contains **3 numbers**.
 pos_x pos_y pos_z
 ```
 
+### Recording a practice in game (fshost build)
+
+Admins (`@css/root`) can build a profile on the server instead of copying `getpos` output:
+
+```text
+!prefire rec start a_main        start a route; your position and view are the player start
+!prefire rec bot                 bot where you stand, facing where you look
+!prefire rec crouch              the same, crouching
+!prefire rec aim                 bot on the floor where you aim, facing you
+!prefire rec aimc                the same, crouching
+!prefire rec line                guiding-line point where you stand
+!prefire rec bots 6 0.7          bots alive at once and the random-mode ratio (line 2)
+!prefire rec incompat a_long b   practices that share these bots (line 1)
+!prefire rec undo                remove the last bot or line point
+!prefire rec info | cancel
+!prefire rec save                write maps/<map>/a_main.txt (save force overwrites)
+```
+
+The recorder writes the final format (heights already converted), so don't run its files through `calculate_height.py`. A saved route is in the practice menu right away when nobody is practicing; otherwise after the map reloads. Add a `map.<map>.<name>` line to the files in `lang/` to give it a readable name.
+
+You can also paste `getpos` output (`setpos X Y Z;setang P Y R [True|False]`, or `setpos X Y Z` for a guiding-line point) straight into a profile. The plugin converts the heights itself, so the python script is optional.
+
 ### How to use the python helper script to convert heights
 
 The script *calculate_height.py* receives output of the *getpos* in-game function and automatically convert them to the proper format of bot spawn positions and joint positions of a guiding line. The steps of how it is used is described as follows.
