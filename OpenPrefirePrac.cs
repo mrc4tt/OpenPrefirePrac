@@ -2139,7 +2139,9 @@ public partial class OpenPrefirePrac : BasePlugin
             var ownerOrigin = player.PlayerPawn.Value.AbsOrigin!;
             float ownerEyeX = ownerOrigin.X;
             float ownerEyeY = ownerOrigin.Y;
-            float ownerEyeZ = ownerOrigin.Z + player.PlayerPawn.Value.ViewmodelOffsetZ;
+            // Eye height (m_vecViewOffset), not ViewmodelOffsetZ - that's the weapon model's offset, which
+            // made bots aim at about the player's feet.
+            float ownerEyeZ = ownerOrigin.Z + player.PlayerPawn.Value.ViewOffset.Z;
 
             foreach (var botSlot in status.Bots)
             {
@@ -2156,18 +2158,19 @@ public partial class OpenPrefirePrac : BasePlugin
                 // calculate angle
                 float deltaX = ownerEyeX - botOrigin.X;
                 float deltaY = ownerEyeY - botOrigin.Y;
-                float deltaZ = ownerEyeZ - (botOrigin.Z + botPawn.ViewmodelOffsetZ);
+                float deltaZ = ownerEyeZ - (botOrigin.Z + botPawn.ViewOffset.Z);
                 double yaw = 180 * Math.Atan2(deltaY, deltaX) / Math.PI;
                 double tmp = Math.Sqrt(deltaX * deltaX + deltaY * deltaY);
                 double pitch = 180 * Math.Atan2(-1 * deltaZ, tmp) / Math.PI;
 
-                if (pitch < 15 && pitch > -15)
-                {
-                    _aimLockAngle.X = (float)pitch;
-                    _aimLockAngle.Y = (float)yaw;
-                    _aimLockAngle.Z = 0;
-                    botPawn.Teleport(null, _aimLockAngle, null);
-                }
+                // Turn the body towards the player on every tick, upright (yaw only). It used to turn only
+                // while the height difference was under 15 degrees, so bots above or below the player
+                // (heaven, boost, balcony...) kept facing the wrong way and never shot. The vertical aim
+                // goes through EyeAngles below.
+                _aimLockAngle.X = 0;
+                _aimLockAngle.Y = (float)yaw;
+                _aimLockAngle.Z = 0;
+                botPawn.Teleport(null, _aimLockAngle, null);
 
                 botPawn.EyeAngles.X = (float)pitch;
                 botPawn.EyeAngles.Y = (float)yaw;

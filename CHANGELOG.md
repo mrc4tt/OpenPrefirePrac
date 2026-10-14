@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.1.49
+- Aim lock (`BotAimLock` 1): bots above or below the player (e.g. heaven, boost, balcony) now turn towards the player too; before, only bots within 15 degrees of height were turned, so the rest faced away and never shot. Bots now aim from their eyes at the player's eyes instead of at about foot height.
 - Bots no longer stand at their spot frozen in a running pose: they are moved there right after spawning and frozen once they stand still (before, they were frozen mid-run and moved afterwards).
 - Fixed a bot join/kick loop when a route starts, which could freeze clients: every `bot_add` also raised `bot_quota` in CS2, so the server added extra bots that the plugin kicked and the server added again. Practice bots are now added by setting `bot_quota` to exactly the number the routes need, and it is kept there while bots are kicked.
 - New de_cache practices: Mid to Heaven (51 bots), A main (73) and B main (70), converted with permission from the workshop map "Cache prefire by someBOT". The bot positions come from pro match footage; credit to someBOT.
