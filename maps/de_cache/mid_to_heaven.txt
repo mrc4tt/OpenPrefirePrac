@@ -1,0 +1,90 @@
+a_main b_main
+8 0.55
+1300 300 1612 0 -107.967522 0
+1009 107.4 1612 0 -118.5 0 False # Garage (mid_34, someBOT)
+834.6 59.6 1612 0 28.5 0 False # Garage (mid_35, someBOT)
+365.8 471.9 1616 0 -19 0 False # Mid (mid_45, someBOT)
+895.2 261.4 1612 0 -136.2 0 False # Garage (mid_06, someBOT)
+559.1 440.6 1612 0 7 0 False # Mid (mid_37, someBOT)
+1013.4 469.9 1612 0 -94.4 0 False # Garage (mid_05, someBOT)
+850.8 466.8 1612 0 64.7 0 False # Garage (mid_33, someBOT)
+538 570 1612 0 7 0 False # Cubby (mid_01, someBOT)
+801.7 218.7 1612 0 6.4 0 False # Mid (mid_23, someBOT)
+356.8 323 1611.3 0 -12.4 0 False # Mid (mid_36, someBOT)
+391.24 475.95 1752.5 15.29 -28.26 0 False # Mid (mid_20, someBOT)
+220.5 169.4 1612 0 10.1 0 False # Mid (mid_27, someBOT)
+220.1 406.8 1673.5 0 -9.9 0 False # Mid (mid_38, someBOT)
+418.1 462.4 1612 0 -27.6 0 False # Mid (mid_44, someBOT)
+11.27 471.62 1709.6 8.51 -14.52 0 False # Mid (mid_21, someBOT)
+-94.1 250 1608 0 -1.6 0 False # Mid (mid_42, someBOT)
+-100.4 495.9 1671.4 0 -24.4 0 False # Mid (mid_02, someBOT)
+-295.6 202 1636.7 0 1.3 0 False # Mid (mid_26, someBOT)
+-273.9 434.1 1612 0 -12.6 0 False # Mid (mid_08, someBOT)
+-420 20 1666 0 9 0 False # CT Connector (mid_10, someBOT)
+-510.1 14.2 1664 0 9 0 False # CT Connector (mid_03, someBOT)
+-560 20 1666 0 9 0 False # CT Connector (mid_12, someBOT)
+712.1 115.2 1612 0 10.8 0 False # Mid (mid_41, someBOT)
+742.4 459.1 1612 0 3.2 0 False # Mid (mid_39, someBOT)
+609.7 -4 1662.5 0 75.8 0 False # Mid (mid_40, someBOT)
+779.94 577.97 1612 0.55 -90.98 0 False # Boost (mid_18, someBOT)
+499.3 85.4 1622.2 0 26.2 0 False # Mid (mid_24, someBOT)
+337.3 99.3 1612 0 17.3 0 False # Mid (mid_28, someBOT)
+523.3 -153.5 1746 0 50.3 0 False # Vents (mid_04, someBOT)
+417.5 -104.9 1781.5 0 57.2 0 False # Mid (mid_29, someBOT)
+-25.4 66.2 1612 0 14.1 0 False # Mid (mid_07, someBOT)
+745.9 -87.2 1640.1 0 41.1 0 False # Mid (mid_43, someBOT)
+-269.6 -39 1704.5 0 41.7 0 False # Mid (mid_25, someBOT)
+-477.9 -103.3 1666.8 0 26.4 0 False # CT Connector (mid_57, someBOT)
+579.97 725.95 1612 1.39 -88.96 0 False # Cubby (mid_19, someBOT)
+-164.4 -115.8 1612 0 44 0 False # Mid (mid_32, someBOT)
+54.02 -142.94 1612 -0.04 79.34 0 False # Mid (mid_22, someBOT)
+-258.1 606.1 1634 0 -43.9 0 False # Highway (mid_13, someBOT)
+-306.2 736.4 1668.8 0 -51.9 0 False # Highway (mid_09, someBOT)
+-128.4 569.7 1627.7 0 -57.9 0 False # Highway (mid_11, someBOT)
+-1006.2 229.3 1614 0 6.1 0 False # CT Halls (mid_48, someBOT)
+-841.1 104.5 1615 0 16.5 0 False # CT Halls (mid_49, someBOT)
+-1015.9 -12.6 1616.9 0 33.2 0 False # CT Halls (mid_47, someBOT)
+-960.7 -105.3 1612 0 49.7 0 False # CT Halls (mid_50, someBOT)
+-753.5 -297.7 1612 0 -132.3 0 False # CT Halls (mid_53, someBOT)
+-878.6 -314.5 1612 0 84.7 0 False # CT Halls (mid_51, someBOT)
+-999.4 -380.3 1612 0 73.1 0 False # CT Halls (mid_52, someBOT)
+-837.1 -476.1 1612 0 90.9 0 False # Hell (mid_55, someBOT)
+-805.2 -1030 1613 0 95.3 0 False # B Site Entrance (mid_46, someBOT)
+-600.9 -424.2 1642.2 0 125.8 0 False # Hell (mid_56, someBOT)
+-577.5 -649.5 1792.3 0 94.2 0 False # Heaven (mid_54, someBOT)
+1300 300 1621
+1290 252 1617
+1242 204 1621
+1242 108 1619
+1194 60 1618
+992 108 1621
+848 252 1621
+800 180 1621
+20 360 1621
+-20 365 1621
+-60 365 1621
+-95.8 350.7 1621
+-138.4 311.4 1617
+-176.8 262.5 1617
+-214.6 212.8 1617
+-253.5 162.3 1621
+-284 108.2 1669
+-301.2 49.9 1673
+-341.8 22.7 1673
+-394.2 40 1673
+-553.1 138.3 1673
+-610.6 155.2 1668.1
+-733.1 169.2 1626.9
+-795.4 166.9 1623
+-845.6 141.1 1623
+-860.2 87.1 1624
+-859.2 25.1 1621
+-833.3 -159.5 1621
+-793.6 -203.4 1621
+-641.9 -309.1 1623
+-608.4 -358.5 1622.5
+-600.4 -415.1 1629
+-596.4 -470 1669
+-590.5 -550.9 1717
+-572.4 -582.1 1741
+-573.6 -603.6 1757

@@ -133,6 +133,13 @@ Each line contains **3 numbers**.
 pos_x pos_y pos_z
 ```
 
+### de_cache routes (fshost build)
+
+The `maps/de_cache` routes (Mid to Heaven, A main, B main) are converted from the workshop map
+[Cache prefire by someBOT](https://steamcommunity.com/sharedfiles/filedetails/?id=3770489042) with the
+author's permission. All bot positions and routes are someBOT's work. `tools/convert_somebot_cache.py`
+regenerates them from the workshop map.
+
 ### Recording a practice in game (fshost build)
 
 Admins (`@css/root`) can build a profile on the server instead of copying `getpos` output:

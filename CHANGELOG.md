@@ -1,6 +1,7 @@
 # Changelog
 
 ## 0.1.49
+- New de_cache practices: Mid to Heaven (51 bots), A main (73) and B main (70), converted with permission from the workshop map "Cache prefire by someBOT". The bot positions come from pro match footage; credit to someBOT.
 - In-game practice recorder for admins (`!prefire rec ...`): start a route, add bots where you stand or where you aim, add guiding-line points, undo, and save to `maps/<map>/<name>.txt`. The route is available right away when nobody is practicing. See the README.
 - Profiles accept lines pasted straight from `getpos` (`setpos ...;setang ... [True|False]` for bots and the player start, `setpos X Y Z` for guiding-line points). Heights are converted like `calculate_height.py` does, so the script is optional.
 - Numbers in profiles are always read with a dot as the decimal separator, whatever the server's language setting.
