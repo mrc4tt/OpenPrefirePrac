@@ -57,6 +57,9 @@ public partial class OpenPrefirePrac : BasePlugin
 
     private readonly List<int> _aimLockSlots = new();
 
+    // Degrees a frozen bot's body may be off the direction to its player before the aim lock turns it.
+    private const double AimLockYawTolerance = 5.0;
+
     // Practices are played against bots, so they cannot work on a server started with -nobots:
     // bot_add does not give working bots there and players end up shooting at invisible targets.
     private bool _botsDisabled;
@@ -2167,10 +2170,18 @@ public partial class OpenPrefirePrac : BasePlugin
                 // while the height difference was under 15 degrees, so bots above or below the player
                 // (heaven, boost, balcony...) kept facing the wrong way and never shot. The vertical aim
                 // goes through EyeAngles below.
-                _aimLockAngle.X = 0;
-                _aimLockAngle.Y = (float)yaw;
-                _aimLockAngle.Z = 0;
-                botPawn.Teleport(null, _aimLockAngle, null);
+                // Only when it is noticeably off, though: every Teleport (even angles only) resets the bot's
+                // lag-compensation history ("No valid positions in history for BacktrackPlayer"), so
+                // turning every bot on every tick broke hit registration on them.
+                var currentYaw = botPawn.AbsRotation?.Y ?? float.NaN;
+                var yawError = Math.Abs(Math.IEEERemainder(yaw - currentYaw, 360.0));
+                if (double.IsNaN(yawError) || yawError > AimLockYawTolerance)
+                {
+                    _aimLockAngle.X = 0;
+                    _aimLockAngle.Y = (float)yaw;
+                    _aimLockAngle.Z = 0;
+                    botPawn.Teleport(null, _aimLockAngle, null);
+                }
 
                 botPawn.EyeAngles.X = (float)pitch;
                 botPawn.EyeAngles.Y = (float)yaw;
