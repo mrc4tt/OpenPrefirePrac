@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.50
+- Only `<name>.txt` files in `maps/<map>/` load as practices. Any other file there (e.g. `a_main.txt.new` that the plugin manager puts next to a route the customer edited, or a backup copy) used to load under the same name and break loading the map's practices.
+
 ## 0.1.49
 - Aim lock (`BotAimLock` 1): bots above or below the player (e.g. heaven, boost, balcony) now turn towards the player too; before, only bots within 15 degrees of height were turned, so the rest faced away and never shot. Bots now aim from their eyes at the player's eyes instead of at about foot height. A bot's body is only turned when it is more than 5 degrees off, because every turn (a teleport) resets its lag-compensation history.
 - Bots no longer stand at their spot frozen in a running pose: they are moved there right after spawning and frozen once they have landed (before, they were frozen mid-run and moved afterwards). Bots whose spot is a bit above the floor (several de_cache spots) no longer hang in the air in a falling pose: they are frozen on the floor below their spot.

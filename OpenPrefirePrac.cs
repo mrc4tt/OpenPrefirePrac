@@ -17,7 +17,7 @@ namespace OpenPrefirePrac;
 public partial class OpenPrefirePrac : BasePlugin
 {
     public override string ModuleName => "Open Prefire Prac";
-    public override string ModuleVersion => "0.1.49";
+    public override string ModuleVersion => "0.1.50";
     public override string ModuleAuthor => "Lengran";
     public override string ModuleDescription => "A plugin for practicing prefire in CS2. https://github.com/lengran/OpenPrefirePrac";
 
@@ -794,16 +794,29 @@ public partial class OpenPrefirePrac : BasePlugin
     private void LoadPractice()
     {
         Console.WriteLine($"[OpenPrefirePrac] Loading practices for map {_mapName}.");
-        var practiceFiles = new List<string>(Directory.EnumerateFiles($"{ModuleDirectory}/maps/{_mapName}"));
         _practices.Clear();
         _practiceNameToId.Clear();
         _pracConflictCount.Clear();
-        for (var i = 0; i < practiceFiles.Count; i++)
+
+        var mapDirectory = $"{ModuleDirectory}/maps/{_mapName}";
+        if (!Directory.Exists(mapDirectory))
+            return;
+
+        // Only <name>.txt is a practice. Other files (e.g. a_main.txt.new that the plugin manager puts
+        // next to a customer-edited route, or a backup) used to load under the same name and crash the
+        // load on the duplicate key.
+        var practiceNames = Directory.EnumerateFiles(mapDirectory, "*.txt")
+            .Where(file => string.Equals(Path.GetExtension(file), ".txt", StringComparison.OrdinalIgnoreCase))
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(name => !string.IsNullOrEmpty(name) && !name!.Contains('.'))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(name => name, StringComparer.Ordinal);
+        foreach (var practiceName in practiceNames)
         {
-            var practiceName = practiceFiles[i].Substring(practiceFiles[i].LastIndexOf(Path.DirectorySeparatorChar) + 1).Split(".")[0];
-            _practices.Add(new PrefirePractice(ModuleDirectory, _mapName, practiceName));
-            _practiceNameToId.Add(practiceName, i);
-            _pracConflictCount.Add(i, 0);
+            var id = _practices.Count;
+            _practices.Add(new PrefirePractice(ModuleDirectory, _mapName, practiceName!));
+            _practiceNameToId.Add(practiceName!, id);
+            _pracConflictCount.Add(id, 0);
             Console.WriteLine($"[OpenPrefirePrac] {_mapName} {practiceName} Loaded.");
         }
     }
