@@ -24,6 +24,7 @@ public partial class OpenPrefirePrac : BasePlugin
     private readonly Dictionary<int, PlayerStatus> _playerStatuses = new();         // Key: slot of player
     
     private readonly Dictionary<int, int> _ownerOfBots = new();       // Map: slot of bot -> owner.
+    private readonly Dictionary<int, int> _botPlacement = new();      // Map: slot of bot -> placement count, so an old SettleAndFreezeBot stops.
     
     private readonly Dictionary<string, int> _practiceNameToId = new();
     
@@ -403,8 +404,8 @@ public partial class OpenPrefirePrac : BasePlugin
 
                     // Move first, freeze after: the bot used to be frozen at 0.5s and moved at 0.55s, so it
                     // was frozen mid-run (left out of spawn) and kept its running legs at the target.
-                    // Teleport it with zero velocity right after spawning, then freeze it once it stands
-                    // still, and place it once more so it is exactly on the spot.
+                    // Teleport it with zero velocity right after spawning, then freeze it once it has landed
+                    // (see SettleAndFreezeBot).
                     AddTimer(0.1f, () =>
                     {
                         // Bail if owner stopped practicing or bot got kicked meanwhile.
@@ -414,14 +415,8 @@ public partial class OpenPrefirePrac : BasePlugin
                         MovePlayer(playerOrBot, target.IsCrouching, target.Position, target.Rotation);
                     });
 
-                    AddTimer(0.4f, () =>
-                    {
-                        if (!_ownerOfBots.ContainsKey(botSlot) || !_playerStatuses.ContainsKey(ownerSlot))
-                            return;
-
-                        FreezeBot(playerOrBot);
-                        MovePlayer(playerOrBot, target.IsCrouching, target.Position, target.Rotation);
-                    });
+                    var placement = _botPlacement[botSlot] = _botPlacement.GetValueOrDefault(botSlot) + 1;
+                    AddTimer(0.2f, () => SettleAndFreezeBot(playerOrBot, botSlot, ownerSlot, target, placement, 0, 0));
                     
 
                     // Give bot weapons
@@ -984,6 +979,39 @@ public partial class OpenPrefirePrac : BasePlugin
         }
         
         player.PlayerPawn.Value.Teleport(pos, ang, Vector.Zero);
+    }
+
+    /// <summary>
+    /// Freezes a bot once it has landed. Some profiles (e.g. the converted de_cache routes) place bots a
+    /// bit above the floor; freezing them at a fixed time and teleporting them back to the profile
+    /// position left them hanging in the air in a falling pose. Wait until the bot has stood on the
+    /// ground for two checks in a row (or give up after ~1.5s), then freeze it on the profile spot at the height it landed on (the bot may have taken a step).
+    /// </summary>
+    private void SettleAndFreezeBot(CCSPlayerController bot, int botSlot, int ownerSlot, TargetBot target, int placement, int attempt, int groundedChecks)
+    {
+        // Bail if owner stopped practicing, bot got kicked, or the bot was placed again meanwhile.
+        if (!_ownerOfBots.ContainsKey(botSlot) || !_playerStatuses.ContainsKey(ownerSlot)
+            || _botPlacement.GetValueOrDefault(botSlot) != placement)
+            return;
+
+        var pawn = bot.IsValid && bot.PawnIsAlive ? bot.PlayerPawn.Value : null;
+        if (pawn == null || !pawn.IsValid)
+            return;
+
+        groundedChecks = (pawn.Flags & (uint)PlayerFlags.FL_ONGROUND) != 0 ? groundedChecks + 1 : 0;
+        if (groundedChecks < 2 && attempt < 15)
+        {
+            AddTimer(0.1f, () => SettleAndFreezeBot(bot, botSlot, ownerSlot, target, placement, attempt + 1, groundedChecks));
+            return;
+        }
+
+        var origin = pawn.AbsOrigin;
+        var landed = origin != null && groundedChecks >= 2
+            ? new Vector(target.Position.X, target.Position.Y, origin.Z)
+            : target.Position;
+
+        FreezeBot(bot);
+        MovePlayer(bot, target.IsCrouching, landed, target.Rotation);
     }
 
     private void FreezeBot(CCSPlayerController? bot)
