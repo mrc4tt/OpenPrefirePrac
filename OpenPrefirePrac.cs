@@ -259,8 +259,9 @@ public partial class OpenPrefirePrac : BasePlugin
                 }
                 else
                 {
-                    // Already have enough bots, kick this bot.
+                    // Already have enough bots, kick this bot and make sure the quota doesn't add it back.
                     KickBot(slot);
+                    SyncBotQuota();
                 }
             }
         }
@@ -915,21 +916,32 @@ public partial class OpenPrefirePrac : BasePlugin
             _botRequests.Add(player.Slot, numberOfBots);
         }
 
-        for (var i = 0; i < numberOfBots; i++)
-        {
-            AddTimer(i * 0.1f, () => {
-                if (player.TeamNum == (byte)CsTeam.CounterTerrorist)
-                {
-                    Server.ExecuteCommand("bot_join_team T");
-                    Server.ExecuteCommand("bot_add_t");
-                }
-                else if (player.TeamNum == (byte)CsTeam.Terrorist)
-                {
-                    Server.ExecuteCommand("bot_join_team CT");
-                    Server.ExecuteCommand("bot_add_ct");
-                }
-            });
-        }
+        // Bots join the opposing team. They are added by raising bot_quota to exactly the number of bots
+        // the practices need, instead of one bot_add per bot: in CS2 every bot_add also raises bot_quota,
+        // so the engine added extra bots to meet the quota, the plugin kicked them as unmanaged, and the
+        // engine re-added them - a join/kick loop that froze clients.
+        if (player.TeamNum == (byte)CsTeam.CounterTerrorist)
+            Server.ExecuteCommand("bot_join_team T");
+        else if (player.TeamNum == (byte)CsTeam.Terrorist)
+            Server.ExecuteCommand("bot_join_team CT");
+        else
+            return;
+
+        SyncBotQuota();
+    }
+
+    /// <summary>
+    /// Keeps bot_quota equal to the bots the practices own plus the ones still requested, so the engine
+    /// never adds a bot nobody asked for. Only while someone practices; RestoreConvars puts the server's
+    /// own bot_quota back afterwards.
+    /// </summary>
+    private void SyncBotQuota()
+    {
+        if (_playerCount <= 0)
+            return;
+
+        var wanted = _ownerOfBots.Count + _botRequests.Values.Sum();
+        Server.ExecuteCommand($"bot_quota_mode normal; bot_quota {wanted}");
     }
 
     private void MovePlayer(CCSPlayerController? player, bool crouch, Vector pos, QAngle ang)
@@ -1990,6 +2002,9 @@ public partial class OpenPrefirePrac : BasePlugin
 
         Server.ExecuteCommand($"bot_kick {bot.PlayerName}");
         Console.WriteLine($"[OpenPrefirePrac] Exec command: bot_kick {bot.PlayerName}");
+
+        // A kicked bot must not be refilled by bot_quota.
+        SyncBotQuota();
     }
 
     // Thanks to B3none
