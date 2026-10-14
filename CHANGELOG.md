@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.48
+- Each player's guiding line is only sent to that player. Before, every client drew every practicing player's line beams.
+
 ## 0.1.47
 - First fshost release, based on lengran/OpenPrefirePrac 0.1.47.
 - Built against CounterStrikeSharp 1.0.407 (mrc4tt/CounterStrikeSharp).

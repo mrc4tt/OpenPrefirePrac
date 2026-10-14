@@ -17,7 +17,7 @@ namespace OpenPrefirePrac;
 public class OpenPrefirePrac : BasePlugin
 {
     public override string ModuleName => "Open Prefire Prac";
-    public override string ModuleVersion => "0.1.47";
+    public override string ModuleVersion => "0.1.48";
     public override string ModuleAuthor => "Lengran";
     public override string ModuleDescription => "A plugin for practicing prefire in CS2. https://github.com/lengran/OpenPrefirePrac";
 
@@ -286,6 +286,7 @@ public class OpenPrefirePrac : BasePlugin
 
         // Release resources(practices, targets, bots...)
         _playerStatuses.Remove(player.Slot);
+        UpdateGuidingLineTransmit();
         if (_botRequests.ContainsKey(player.Slot))
         {
             _botRequests.Remove(player.Slot);
@@ -308,6 +309,8 @@ public class OpenPrefirePrac : BasePlugin
         }
 
         _playerStatuses.Remove(slot);
+
+        UpdateGuidingLineTransmit();
         _botRequests.Remove(slot);   // Remove() on absent key is a safe no-op
     }
 
@@ -1039,6 +1042,58 @@ public class OpenPrefirePrac : BasePlugin
 
             _playerStatuses[playerSlot].Beams.Add(beam);
         }
+
+        UpdateGuidingLineTransmit();
+    }
+
+    // Each practicing player's guiding line is a chain of beams, and every client drew every player's
+    // lines. Send each line only to its owner. The CheckTransmit listener runs every tick for every
+    // recipient, so it is only registered while at least one line exists.
+    private Listeners.CheckTransmit? _guidingLineTransmitHandler;
+
+    private void UpdateGuidingLineTransmit()
+    {
+        bool anyLines = _playerStatuses.Values.Any(status => status.Beams.Count > 0);
+        if (anyLines && _guidingLineTransmitHandler == null)
+        {
+            _guidingLineTransmitHandler = OnGuidingLineCheckTransmit;
+            RegisterListener(_guidingLineTransmitHandler);
+        }
+        else if (!anyLines && _guidingLineTransmitHandler != null)
+        {
+            RemoveListener(_guidingLineTransmitHandler);
+            _guidingLineTransmitHandler = null;
+        }
+    }
+
+    private void OnGuidingLineCheckTransmit(CCheckTransmitInfoList infoList)
+    {
+        try
+        {
+            foreach ((CCheckTransmitInfo info, CCSPlayerController? player) in infoList)
+            {
+                if (player == null || !player.IsValid)
+                    continue;
+
+                var transmitEntities = info.TransmitEntities;
+                foreach (var (ownerSlot, status) in _playerStatuses)
+                {
+                    if (ownerSlot == player.Slot || status.Beams.Count == 0)
+                        continue;
+
+                    foreach (var beam in status.Beams)
+                    {
+                        if (beam != null && beam.IsValid)
+                            transmitEntities.Remove(beam);
+                    }
+                }
+            }
+        }
+        catch (Exception e)
+        {
+            // Never throw out of the transmit path.
+            Console.WriteLine($"[OpenPrefirePrac] Guiding line transmit: {e.Message}");
+        }
     }
 
     private void DeleteGuidingLine(int playerSlot)
@@ -1060,6 +1115,7 @@ public class OpenPrefirePrac : BasePlugin
         }
 
         _playerStatuses[playerSlot].Beams.Clear();
+        UpdateGuidingLineTransmit();
     }
 
     private static CBeam? DrawBeam(Vector startPos, Vector endPos)
