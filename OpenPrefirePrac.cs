@@ -1369,8 +1369,12 @@ public partial class OpenPrefirePrac : BasePlugin
         // Set behavior tree for bots (many thanks to 5EPlay)
         if (_defaultPlayerSettings!.BotAimLock == 2)
         {
-            Server.ExecuteCommand("mp_bot_ai_bt \"addons\\counterstrikesharp\\plugins\\OpenPrefirePrac\\resources\\bt\\hard_mode.kv3\"");
-            Server.ExecuteCommand("mp_bot_ai_bt_clear_cache");
+            var behaviourTree = PrepareBehaviourTree();
+            if (behaviourTree != null)
+            {
+                Server.ExecuteCommand($"mp_bot_ai_bt \"{behaviourTree}\"");
+                Server.ExecuteCommand("mp_bot_ai_bt_clear_cache");
+            }
         }
 
         // Kick unmanaged bots
@@ -1411,6 +1415,56 @@ public partial class OpenPrefirePrac : BasePlugin
         Server.ExecuteCommand("mp_respawn_on_death_t 1");
 
         Console.WriteLine("[OpenPrefirePrac] Values of convars set.");
+    }
+
+    // The hard-mode behaviour tree files reference each other by a path fixed to
+    // plugins/OpenPrefirePrac/resources/bt, so they broke whenever the plugin lived anywhere else
+    // (plugins/disabled/OpenPrefirePrac on fshost, or a folder a customer moved over FTP). Copy them to
+    // configs/plugins/OpenPrefirePrac/bt with the paths rewritten to that copy: configs/ never moves and
+    // is never replaced by plugin updates. Returns the mp_bot_ai_bt path (relative to csgo/), or null.
+    private const string BehaviourTreeShippedPath = "addons//counterstrikesharp//plugins//OpenPrefirePrac//resources//bt//";
+    private const string BehaviourTreeConfigPath = "addons//counterstrikesharp//configs//plugins//OpenPrefirePrac//bt//";
+    private string? _behaviourTreePath;
+
+    private string? PrepareBehaviourTree()
+    {
+        if (_behaviourTreePath != null)
+            return _behaviourTreePath;
+
+        try
+        {
+            var csgo = Path.Combine(Server.GameDirectory, "csgo");
+            var sourceDir = new[]
+            {
+                Path.Combine(ModuleDirectory, "resources", "bt"),
+                // fshost keeps resources/bt in plugins/OpenPrefirePrac while the plugin is in plugins/disabled.
+                Path.Combine(csgo, "addons", "counterstrikesharp", "plugins", "OpenPrefirePrac", "resources", "bt"),
+            }.FirstOrDefault(dir => File.Exists(Path.Combine(dir, "hard_mode.kv3")));
+
+            if (sourceDir == null)
+            {
+                Console.WriteLine("[OpenPrefirePrac] resources/bt/hard_mode.kv3 not found; hard mode bots use the default behaviour.");
+                return null;
+            }
+
+            var targetDir = Path.Combine(csgo, "addons", "counterstrikesharp", "configs", "plugins", "OpenPrefirePrac", "bt");
+            Directory.CreateDirectory(targetDir);
+            foreach (var file in Directory.GetFiles(sourceDir, "*.kv3"))
+            {
+                var text = File.ReadAllText(file).Replace(BehaviourTreeShippedPath, BehaviourTreeConfigPath);
+                var target = Path.Combine(targetDir, Path.GetFileName(file));
+                if (!File.Exists(target) || File.ReadAllText(target) != text)
+                    File.WriteAllText(target, text);
+            }
+
+            _behaviourTreePath = BehaviourTreeConfigPath.Replace("//", "\\") + "hard_mode.kv3";
+            return _behaviourTreePath;
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"[OpenPrefirePrac] Could not prepare the behaviour tree: {e.Message}");
+            return null;
+        }
     }
 
     private void RefillAmmo(CCSPlayerController player)

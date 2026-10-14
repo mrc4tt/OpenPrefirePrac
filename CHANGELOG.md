@@ -7,6 +7,7 @@
 - A route without a name in `lang/` (a newly recorded route, or a deploy without the lang folder) shows its file name in readable form ("B main") instead of the raw key `map.de_cache.b_main`.
 - After `!prefireon` everyone on the server is told to type `!prefire` to choose a route.
 - No freeze time while the plugin is loaded: it is cleared again on every map (re)load, not only when a route starts.
+- Hard-mode bots (`BotAimLock` 2) work wherever the plugin folder is (`plugins/`, `plugins/disabled/`, or moved over FTP): the behaviour tree files are copied to `configs/plugins/OpenPrefirePrac/bt/` with their internal paths rewritten, instead of requiring them at `plugins/OpenPrefirePrac/resources/bt/`.
 - A plain `dotnet build`/`publish -c Release` now copies `maps/`, `lang/` and `resources/` next to the dll.
 - Numbers in profiles are always read with a dot as the decimal separator, whatever the server's language setting.
 
