@@ -48,7 +48,7 @@ for key, (fname, n, ratio) in ROUTES.items():
     lines = [' '.join(x for x in names if x != fname), f'{n} {ratio}',
              ' '.join(f(v) for v in st.groups())]
     for s in slots:
-        lines.append(' '.join(f(v) for v in (*s['pos'], *s['ang'])) + f" False # {s['callout']} ({s['id']}, someBOT)")
+        lines.append(' '.join(f(v) for v in (*s['pos'], *s['ang'])) + f" False # {s['callout']} ({s['id']})")
     for w in ways:  # guiding-line joints sit 9 units above the floor (eye - 55)
         lines.append(f"{f(w[0])} {f(w[1])} {f(float(w[2]) + 9)}")
     open(os.path.join(outdir, fname + '.txt'), 'w').write('\n'.join(lines) + '\n')
